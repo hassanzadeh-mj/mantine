@@ -24,7 +24,6 @@ export function useFocusWithin<T extends HTMLElement = any>({
 }: UseFocusWithinOptions = {}): UseFocusWithinReturnValue<T> {
   const [focused, setFocused] = useState(false);
   const focusedRef = useRef(false);
-  const previousNode = useRef<T | null>(null);
 
   const _setFocused = useCallback((value: boolean) => {
     setFocused(value);
@@ -38,7 +37,7 @@ export function useFocusWithin<T extends HTMLElement = any>({
         onFocus?.(event);
       }
     },
-    [onFocus]
+    [onFocus, _setFocused]
   );
 
   const handleFocusOut = useCallback(
@@ -48,36 +47,29 @@ export function useFocusWithin<T extends HTMLElement = any>({
         onBlur?.(event);
       }
     },
-    [onBlur]
+    [onBlur, _setFocused]
   );
 
-  const callbackRef: React.RefCallback<T | null> = useCallback(
-    (node) => {
-      if (!node) {
-        return;
-      }
+  const nodeRef = useRef<T | null>(null);
 
-      if (previousNode.current) {
-        previousNode.current.removeEventListener('focusin', handleFocusIn);
-        previousNode.current.removeEventListener('focusout', handleFocusOut);
-      }
+  const callbackRef: React.RefCallback<T | null> = useCallback((node) => {
+    nodeRef.current = node;
+  }, []);
 
-      node.addEventListener('focusin', handleFocusIn);
-      node.addEventListener('focusout', handleFocusOut);
-      previousNode.current = node;
-    },
-    [handleFocusIn, handleFocusOut]
-  );
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) {
+      return;
+    }
 
-  useEffect(
-    () => () => {
-      if (previousNode.current) {
-        previousNode.current.removeEventListener('focusin', handleFocusIn);
-        previousNode.current.removeEventListener('focusout', handleFocusOut);
-      }
-    },
-    []
-  );
+    node.addEventListener('focusin', handleFocusIn);
+    node.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      node.removeEventListener('focusin', handleFocusIn);
+      node.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [handleFocusIn, handleFocusOut]);
 
   return { ref: callbackRef, focused };
 }
